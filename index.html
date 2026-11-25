@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#155eef">
+  <meta name="description" content="Arbeitsnachweise mit Fotos und optionaler Unterschrift erstellen – auch offline.">
+  <title>Arbeitsnachweis App</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png" type="image/png">
+  <style>
+    :root {
+      color-scheme: light;
+      --blue: #155eef;
+      --blue-dark: #1248b7;
+      --ink: #172033;
+      --muted: #647086;
+      --line: #e3e8f0;
+      --surface: #fff;
+      --background: #f3f6fb;
+      --danger: #b42318;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--background);
+      color: var(--ink);
+    }
+
+    button, input, textarea { font: inherit; }
+    button { touch-action: manipulation; }
+
+    .topbar {
+      background: linear-gradient(115deg, #123f9e, #155eef 70%, #3b82f6);
+      color: #fff;
+      padding: 26px max(20px, calc((100vw - 900px) / 2)) 32px;
+    }
+
+    .topbar-inner { max-width: 900px; margin: auto; }
+    .eyebrow { margin: 0 0 6px; color: #c9d9ff; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(1.7rem, 5vw, 2.35rem); letter-spacing: -.035em; }
+    .intro { max-width: 610px; margin: 9px 0 0; color: #e1eaff; line-height: 1.55; }
+
+    main { width: min(100% - 28px, 900px); margin: 22px auto 44px; }
+    .offline-note {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 16px;
+      padding: 12px 15px;
+      border: 1px solid #d6e4ff;
+      border-radius: 12px;
+      background: #edf4ff;
+      color: #24477e;
+      font-size: .9rem;
+    }
+    .offline-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #16a36a; }
+
+    .card {
+      margin: 0 0 16px;
+      padding: clamp(18px, 4vw, 27px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 3px 14px rgb(22 39 71 / 4%);
+    }
+
+    .section-heading { display: flex; align-items: center; gap: 12px; margin: 0 0 21px; }
+    .section-number {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 11px;
+      background: #edf3ff;
+      color: var(--blue);
+      font-weight: 800;
+    }
+    h2 { margin: 0; font-size: 1.12rem; letter-spacing: -.01em; }
+    .section-hint { margin: 4px 0 0; color: var(--muted); font-size: .88rem; line-height: 1.5; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    label { display: block; margin: 0 0 7px; color: #344054; font-size: .88rem; font-weight: 650; }
+    input, textarea {
+      width: 100%;
+      min-height: 47px;
+      padding: 11px 13px;
+      border: 1px solid #ccd4e0;
+      border-radius: 9px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    textarea { min-height: 126px; resize: vertical; line-height: 1.55; }
+    input:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb(21 94 239 / 14%); }
+    input::placeholder, textarea::placeholder { color: #98a2b3; }
+    .required { color: var(--blue); }
+
+    .action-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .button {
+      display: inline-flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 11px 16px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+      transition: background .15s, border-color .15s, transform .15s;
+    }
+    .button:hover { background: var(--blue-dark); }
+    .button:active { transform: translateY(1px); }
+    .button:focus-visible { outline: 3px solid #9dbbff; outline-offset: 2px; }
+    .button.secondary { border-color: #cfd7e3; background: #fff; color: #344054; }
+    .button.secondary:hover { border-color: #aab5c5; background: #f8fafc; }
+    .button.danger { border-color: #f1c6c2; background: #fff; color: var(--danger); }
+    .button.danger:hover { background: #fff5f4; }
+    .button:disabled { opacity: .6; cursor: wait; }
+    .button.primary-large { min-height: 54px; padding: 14px 22px; font-size: 1rem; }
+    .button svg { width: 19px; height: 19px; flex: 0 0 auto; }
+
+    .file-input { display: none; }
+    .location-control { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 15px; }
+    .toggle-label { display: inline-flex; align-items: center; gap: 9px; margin: 0; cursor: pointer; }
+    .toggle-label input { width: 18px; min-height: 18px; height: 18px; margin: 0; accent-color: var(--blue); }
+    .help-text { margin: 13px 0 0; color: var(--muted); font-size: .83rem; line-height: 1.5; }
+
+    .photo-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; margin-top: 19px; }
+    .photo-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fafbfd; }
+    .photo-card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #e8edf5; }
+    .photo-card-body { padding: 12px; }
+    .photo-card-title { margin: 0 0 10px; font-size: .9rem; font-weight: 700; }
+    .photo-card-body label { font-size: .82rem; }
+    .photo-card-body input { min-height: 42px; margin-bottom: 10px; font-size: .9rem; }
+    .photo-card-body .button { width: 100%; min-height: 42px; font-size: .88rem; }
+    .empty-photos { margin: 18px 0 0; padding: 20px; border: 1px dashed #cbd4e2; border-radius: 11px; color: var(--muted); font-size: .9rem; text-align: center; }
+
+    .signature-wrap { overflow: hidden; border: 1px solid #ccd4e0; border-radius: 10px; background: #fff; }
+    #signature-canvas { display: block; width: 100%; height: 190px; touch-action: none; }
+    .signature-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+    .signature-status { margin: 0; color: var(--muted); font-size: .84rem; }
+    .form-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 20px; }
+    .notice { min-height: 1.4em; margin: 14px 0 0; color: #344054; font-size: .9rem; line-height: 1.45; }
+    .notice.error { color: var(--danger); }
+    footer { padding: 0 16px 27px; color: var(--muted); font-size: .82rem; text-align: center; }
+
+    @media (max-width: 600px) {
+      .topbar { padding: 22px 18px 26px; }
+      main { width: min(100% - 20px, 900px); margin-top: 14px; }
+      .form-grid, .photo-list { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .action-row { display: grid; grid-template-columns: 1fr; }
+      .action-row .button { width: 100%; }
+      .form-actions { display: grid; grid-template-columns: 1fr; }
+      .form-actions .button { width: 100%; }
+      .photo-card img { aspect-ratio: 16 / 10; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <p class="eyebrow">Elektro Fachbetrieb Jordine</p>
+      <h1>Arbeitsnachweis App</h1>
+      <p class="intro">Arbeitsnachweise direkt vor Ort dokumentieren. Fotos werden mit Auftragsdaten versehen – Ihre Daten bleiben auf diesem Gerät.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="offline-note" role="status"><span class="offline-dot" aria-hidden="true"></span><span id="connection-status">Offline bereit – Ihre Einträge werden nicht hochgeladen.</span></div>
+
+    <form id="report-form">
+      <section class="card" aria-labelledby="master-heading">
+        <div class="section-heading">
+          <span class="section-number" aria-hidden="true">1</span>
+          <div><h2 id="master-heading">Stammdaten</h2><p class="section-hint">Angaben mit <span class="required">*</span> werden für den Nachweis benötigt.</p></div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="date-time">Datum &amp; Uhrzeit <span class="required">*</span></label>
+            <input id="date-time" name="dateTime" type="datetime-local" required>
+          </div>
+          <div class="field">
+            <label for="technician">Monteur Name <span class="required">*</span></label>
+            <input id="technician" name="technician" type="text" autocomplete="name" placeholder="Vor- und Nachname" required>
+          </div>
+          <div class="field">
+            <label for="job-number">Auftragsnummer <span class="required">*</span></label>
+            <input id="job-number" name="jobNumber" type="text" placeholder="z. B. 2-261780" required>
+          </div>
+          <div class="field">
+            <label for="address">Adresse <span class="required">*</span></label>
+            <input id="address" name="address" type="text" autocomplete="street-address" placeholder="Straße, Hausnummer, Ort" required>
+          </div>
+          <div class="field full">
+            <label for="work-description">Arbeitsbeschreibung <span class="required">*</span></label>
+            <textarea id="work-description" name="workDescription" placeholder="Durchgeführte Prüfung / Tätigkeit dokumentieren …" required></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="photos-heading">
+        <div class="section-heading">
+          <span class="section-number" aria-hidden="true">2</span>
+          <div><h2 id="photos-heading">Beweisfotos</h2><p class="section-hint">Wasserzeichen mit Auftragsnummer, Datum und Adresse werden direkt ins Foto eingebrannt.</p></div>
+        </div>
+        <div class="action-row">
+          <button class="button" id="camera-button" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v11H3V8a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Foto aufnehmen
+          </button>
+          <button class="button secondary" id="gallery-button" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m21 15-5-5L5 20"/></svg>
+            Aus Galerie wählen
+          </button>
+        </div>
+        <input class="file-input" id="camera-input" type="file" accept="image/*" capture="environment">
+        <input class="file-input" id="gallery-input" type="file" accept="image/*" multiple>
+        <div class="location-control">
+          <label class="toggle-label" for="include-location"><input id="include-location" type="checkbox"> GPS-Koordinaten im Wasserzeichen ergänzen</label>
+        </div>
+        <p class="help-text">Standort wird nur auf Wunsch abgefragt und den Fotos hinzugefügt. Optional kannst du bei jedem Foto eine Bildunterschrift ergänzen.</p>
+        <div id="photo-list" class="photo-list" aria-live="polite"></div>
+        <p id="empty-photos" class="empty-photos">Noch keine Fotos hinzugefügt.</p>
+      </section>
+
+      <section class="card" aria-labelledby="signature-heading">
+        <div class="section-heading">
+          <span class="section-number" aria-hidden="true">3</span>
+          <div><h2 id="signature-heading">Unterschrift (optional)</h2><p class="section-hint">Der Kunde kann direkt auf dem Bildschirm unterschreiben. Ohne Unterschrift lässt sich der PDF-Nachweis ebenfalls erstellen.</p></div>
+        </div>
+        <div class="signature-wrap"><canvas id="signature-canvas" aria-label="Unterschriftenfeld"></canvas></div>
+        <div class="signature-footer">
+          <p id="signature-status" class="signature-status">Noch keine Unterschrift erfasst.</p>
+          <button class="button danger" id="clear-signature" type="button">Unterschrift löschen</button>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Arbeitsnachweis abschließen">
+        <div class="form-actions">
+          <button class="button primary-large" id="create-pdf" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+            PDF erzeugen &amp; herunterladen
+          </button>
+          <button class="button secondary" id="reset-form" type="button">Neuer Auftrag / Zurücksetzen</button>
+        </div>
+        <p id="app-message" class="notice" role="status" aria-live="polite"></p>
+      </section>
+    </form>
+  </main>
+  <footer>Die Arbeitsnachweise und Fotos werden lokal auf diesem Gerät verarbeitet.</footer>
+  <script src="./jspdf.umd.min.js"></script>
+  <script src="./logo-data.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const $ = (selector) => document.querySelector(selector);
+      const form = $("#report-form");
+      const technicianInput = $("#technician");
+      const cameraInput = $("#camera-input");
+      const galleryInput = $("#gallery-input");
+      const photoList = $("#photo-list");
+      const emptyPhotos = $("#empty-photos");
+      const message = $("#app-message");
+      const photos = [];
+      let signatureHasInk = false;
+      let currentPosition = null;
+      let locationRequest = null;
+      let nextPhotoNumber = 1;
+
+      function setMessage(text, isError = false) {
+        message.textContent = text;
+        message.classList.toggle("error", isError);
+      }
+
+      function localDateTimeValue(date = new Date()) {
+        const offset = date.getTimezoneOffset();
+        return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+      }
+
+      $("#date-time").value = localDateTimeValue();
+      try {
+        technicianInput.value = localStorage.getItem("arbeitsnachweis-technician") || "";
+      } catch (error) {
+        console.warn("Monteurname konnte nicht aus dem lokalen Speicher geladen werden.", error);
+      }
+      technicianInput.addEventListener("input", () => {
+        try {
+          localStorage.setItem("arbeitsnachweis-technician", technicianInput.value.trim());
+        } catch (error) {
+          setMessage("Der Monteurname konnte nicht gespeichert werden. Prüfe den Speicherplatz deines Geräts.", true);
+        }
+      });
+
+      function sanitizeFilename(value) {
+        const cleaned = value.normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/ß/g, "ss")
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 70);
+        return cleaned || "ohne-Angabe";
+      }
+
+      function filenameStem() {
+        return `${sanitizeFilename($("#job-number").value)}_${sanitizeFilename($("#address").value)}`;
+      }
+
+      function formattedDateTime(value = $("#date-time").value) {
+        if (!value) return "";
+        const date = new Date(value);
+        return new Intl.DateTimeFormat("de-DE", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+          hour: "2-digit", minute: "2-digit"
+        }).format(date);
+      }
+
+      function wrapCanvasText(context, text, maxWidth) {
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = "";
+        for (const word of words) {
+          const candidate = line ? `${line} ${word}` : word;
+          if (context.measureText(candidate).width > maxWidth && line) {
+            lines.push(line);
+            line = word;
+          } else {
+            line = candidate;
+          }
+        }
+        if (line) lines.push(line);
+        return lines;
+      }
+
+      function getCurrentLocation() {
+        if (currentPosition) return Promise.resolve(currentPosition);
+        if (locationRequest) return locationRequest;
+        if (!navigator.geolocation) return Promise.reject(new Error("Dieses Gerät unterstützt keine Standortfreigabe."));
+        locationRequest = new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              currentPosition = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+              resolve(currentPosition);
+            },
+            (error) => {
+              const explanation = error.code === error.PERMISSION_DENIED
+                ? "Standortzugriff wurde nicht freigegeben."
+                : error.code === error.POSITION_UNAVAILABLE
+                  ? "Standort ist derzeit nicht verfügbar."
+                  : "Standortabfrage hat das Zeitlimit überschritten.";
+              reject(new Error(explanation));
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+          );
+        }).finally(() => { locationRequest = null; });
+        return locationRequest;
+      }
+
+      function watermarkImage(image, photoNumber, gpsCoordinates) {
+        const maxDimension = 3000;
+        const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Dein Browser kann Fotos nicht verarbeiten.");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const fontSize = Math.max(20, Math.round(canvas.width * 0.027));
+        const padding = Math.max(16, Math.round(canvas.width * 0.025));
+        const lineHeight = Math.round(fontSize * 1.35);
+        const watermarkLines = [
+          `Auftrag: ${$("#job-number").value.trim() || "Ohne Auftragsnummer"}`,
+          `Datum: ${formattedDateTime()}`,
+          `Adresse: ${$("#address").value.trim() || "Ohne Adresse"}`,
+          ...(gpsCoordinates ? [`GPS: ${gpsCoordinates}`] : [])
+        ];
+        context.font = `600 ${fontSize}px system-ui, sans-serif`;
+        const lines = watermarkLines.flatMap((line) => wrapCanvasText(context, line, canvas.width - padding * 2));
+        const barHeight = padding * 1.5 + lineHeight * lines.length;
+        context.fillStyle = "rgba(10, 17, 29, 0.82)";
+        context.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
+        context.fillStyle = "#ffffff";
+        context.textBaseline = "top";
+        lines.forEach((line, index) => {
+          context.fillText(line, padding, canvas.height - barHeight + padding + index * lineHeight);
+        });
+        return new Promise((resolve, reject) => canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Das Foto konnte nicht als JPEG gespeichert werden."));
+        }, "image/jpeg", 0.9)).then((blob) => ({
+          blob,
+          url: URL.createObjectURL(blob),
+          number: photoNumber,
+          caption: "",
+          gps: gpsCoordinates || ""
+        }));
+      }
+
+      function drawPhotoCard(photo) {
+        const card = document.createElement("article");
+        card.className = "photo-card";
+        const preview = document.createElement("img");
+        preview.src = photo.url;
+        preview.alt = `Wasserzeichen-Foto ${photo.number}`;
+        preview.loading = "lazy";
+        const body = document.createElement("div");
+        body.className = "photo-card-body";
+        const title = document.createElement("p");
+        title.className = "photo-card-title";
+        title.textContent = `Foto ${photo.number}`;
+        const label = document.createElement("label");
+        label.textContent = "Bildunterschrift (optional)";
+        label.htmlFor = `photo-caption-${photo.number}`;
+        const caption = document.createElement("input");
+        caption.id = label.htmlFor;
+        caption.type = "text";
+        caption.placeholder = "z. B. Verteiler nach Prüfung";
+        caption.value = photo.caption;
+        caption.addEventListener("input", () => { photo.caption = caption.value; });
+        const download = document.createElement("button");
+        download.type = "button";
+        download.className = "button secondary";
+        download.textContent = "Foto herunterladen";
+        download.addEventListener("click", () => downloadPhoto(photo));
+        body.append(title, label, caption, download);
+        card.append(preview, body);
+        photoList.append(card);
+      }
+
+      function updatePhotoCount() {
+        emptyPhotos.hidden = photos.length > 0;
+        photoList.hidden = photos.length === 0;
+      }
+
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = filename;
+        anchor.hidden = true;
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+
+      function downloadPhoto(photo) {
+        downloadBlob(photo.blob, `${filenameStem()}_Foto-${photo.number}.jpg`);
+      }
+
+      async function addSelectedFiles(fileList) {
+        const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+        if (!files.length) return;
+        setMessage("Fotos werden vorbereitet und mit einem Wasserzeichen versehen …");
+        let gpsCoordinates = "";
+        if ($("#include-location").checked) {
+          try {
+            setMessage("Standortfreigabe wird abgefragt …");
+            gpsCoordinates = await getCurrentLocation();
+          } catch (error) {
+            $("#include-location").checked = false;
+            setMessage(`${error.message} Die Fotos werden ohne GPS-Koordinaten verarbeitet.`, true);
+          }
+        }
+
+        const addedPhotos = [];
+        try {
+          for (const file of files) {
+            const imageUrl = URL.createObjectURL(file);
+            try {
+              const image = new Image();
+              image.src = imageUrl;
+              await image.decode();
+              const photo = await watermarkImage(image, nextPhotoNumber++, gpsCoordinates);
+              addedPhotos.push(photo);
+            } finally {
+              URL.revokeObjectURL(imageUrl);
+            }
+          }
+        } catch (error) {
+          addedPhotos.forEach((photo) => URL.revokeObjectURL(photo.url));
+          setMessage(`Ein Foto konnte nicht verarbeitet werden: ${error.message}`, true);
+          return;
+        }
+        photos.push(...addedPhotos);
+        addedPhotos.forEach(drawPhotoCard);
+        updatePhotoCount();
+        setMessage(`${addedPhotos.length} ${addedPhotos.length === 1 ? "Foto wurde" : "Fotos wurden"} hinzugefügt.`);
+      }
+
+      $("#camera-button").addEventListener("click", () => cameraInput.click());
+      $("#gallery-button").addEventListener("click", () => galleryInput.click());
+      cameraInput.addEventListener("change", async () => {
+        await addSelectedFiles(cameraInput.files);
+        cameraInput.value = "";
+      });
+      galleryInput.addEventListener("change", async () => {
+        await addSelectedFiles(galleryInput.files);
+        galleryInput.value = "";
+      });
+      $("#include-location").addEventListener("change", (event) => {
+        if (event.target.checked) {
+          currentPosition = null;
+          getCurrentLocation().catch((error) => {
+            event.target.checked = false;
+            setMessage(`${error.message} GPS wurde nicht aktiviert.`, true);
+          });
+        }
+      });
+
+      const signatureCanvas = $("#signature-canvas");
+      const signatureContext = signatureCanvas.getContext("2d");
+      function resizeSignatureCanvas() {
+        const rect = signatureCanvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
+        const oldCanvas = document.createElement("canvas");
+        oldCanvas.width = signatureCanvas.width;
+        oldCanvas.height = signatureCanvas.height;
+        if (signatureCanvas.width && signatureCanvas.height) {
+          oldCanvas.getContext("2d").drawImage(signatureCanvas, 0, 0);
+        }
+        signatureCanvas.width = Math.round(rect.width * pixelRatio);
+        signatureCanvas.height = Math.round(rect.height * pixelRatio);
+        signatureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        signatureContext.lineWidth = 2.5;
+        signatureContext.lineCap = "round";
+        signatureContext.lineJoin = "round";
+        signatureContext.strokeStyle = "#172033";
+        if (oldCanvas.width && oldCanvas.height && signatureHasInk) {
+          signatureContext.drawImage(oldCanvas, 0, 0, oldCanvas.width, oldCanvas.height, 0, 0, rect.width, rect.height);
+        }
+      }
+      resizeSignatureCanvas();
+      if ("ResizeObserver" in window) {
+        new ResizeObserver(resizeSignatureCanvas).observe(signatureCanvas);
+      } else {
+        window.addEventListener("resize", resizeSignatureCanvas);
+      }
+
+      let drawing = false;
+      function signaturePoint(event) {
+        const rect = signatureCanvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+      signatureCanvas.addEventListener("pointerdown", (event) => {
+        drawing = true;
+        signatureCanvas.setPointerCapture(event.pointerId);
+        const point = signaturePoint(event);
+        signatureContext.beginPath();
+        signatureContext.moveTo(point.x, point.y);
+        signatureContext.lineTo(point.x + 0.01, point.y + 0.01);
+        signatureContext.stroke();
+        signatureHasInk = true;
+        $("#signature-status").textContent = "Unterschrift erfasst.";
+      });
+      signatureCanvas.addEventListener("pointermove", (event) => {
+        if (!drawing) return;
+        const point = signaturePoint(event);
+        signatureContext.lineTo(point.x, point.y);
+        signatureContext.stroke();
+      });
+      const stopDrawing = () => { drawing = false; };
+      signatureCanvas.addEventListener("pointerup", stopDrawing);
+      signatureCanvas.addEventListener("pointercancel", stopDrawing);
+      signatureCanvas.addEventListener("lostpointercapture", stopDrawing);
+      $("#clear-signature").addEventListener("click", () => {
+        signatureContext.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        signatureHasInk = false;
+        $("#signature-status").textContent = "Noch keine Unterschrift erfasst.";
+      });
+
+      function ensurePdfSpace(doc, y, requiredHeight) {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        if (y + requiredHeight > pageHeight - 28) {
+          doc.addPage();
+          return 18;
+        }
+        return y;
+      }
+
+      function addPdfLines(doc, lines, x, y, lineHeight) {
+        const bottom = doc.internal.pageSize.getHeight() - 28;
+        let lineIndex = 0;
+        while (lineIndex < lines.length) {
+          if (y + lineHeight > bottom) {
+            doc.addPage();
+            y = 18;
+          }
+          const linesOnPage = Math.max(1, Math.floor((bottom - y) / lineHeight));
+          const pageLines = lines.slice(lineIndex, lineIndex + linesOnPage);
+          doc.text(pageLines, x, y);
+          y += pageLines.length * lineHeight;
+          lineIndex += pageLines.length;
+          if (lineIndex < lines.length) {
+            doc.addPage();
+            y = 18;
+          }
+        }
+        return y;
+      }
+
+      function addSectionHeading(doc, text, y) {
+        y = ensurePdfSpace(doc, y, 13);
+        doc.setFillColor(238, 244, 255);
+        doc.roundedRect(14, y, 182, 8, 1.5, 1.5, "F");
+        doc.setTextColor(21, 94, 239);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(text, 18, y + 5.5);
+        return y + 13;
+      }
+
+      function addPdfFooters(doc) {
+        const pageCount = doc.getNumberOfPages();
+        for (let page = 1; page <= pageCount; page += 1) {
+          doc.setPage(page);
+          const pageHeight = doc.internal.pageSize.getHeight();
+          doc.setDrawColor(220, 226, 235);
+          doc.setLineWidth(0.35);
+          doc.line(14, pageHeight - 22, 196, pageHeight - 22);
+          doc.setTextColor(82, 93, 112);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.text("Erstellt mit Arbeitsnachweis App", 14, pageHeight - 17);
+          doc.text(`Seite ${page} von ${pageCount}`, 196, pageHeight - 17, { align: "right" });
+          doc.text("Elektro Fachbetrieb Jordine | GBP | GmbH - Fred-Joachim-Schoeps-Straße 3, 68229 Mannheim", 14, pageHeight - 11.5);
+        }
+      }
+
+      async function drawPdfLogo(doc) {
+        const image = new Image();
+        image.src = window.COMPANY_LOGO_DATA_URL;
+        await image.decode();
+        const width = 49;
+        const height = width * image.naturalHeight / image.naturalWidth;
+        const x = 196 - width;
+        const y = 12;
+        doc.addImage(image, "PNG", x, y, width, height);
+      }
+
+      async function createPdf() {
+        for (const field of form.querySelectorAll("[required]")) {
+          field.setCustomValidity(field.value.trim() ? "" : "Bitte fülle dieses Feld aus.");
+        }
+        if (!form.reportValidity()) return;
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          setMessage("PDF-Bibliothek fehlt. Lade die App-Dateien erneut und versuche es noch einmal.", true);
+          return;
+        }
+        const button = $("#create-pdf");
+        button.disabled = true;
+        setMessage("PDF wird erstellt …");
+        try {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+          doc.setTextColor(21, 94, 239);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(21);
+          doc.text("Arbeitsnachweis", 14, 23);
+          await drawPdfLogo(doc);
+          doc.setDrawColor(21, 94, 239);
+          doc.setLineWidth(0.8);
+          doc.line(14, 34, 196, 34);
+          let y = 42;
+
+          y = addSectionHeading(doc, "STAMMDATEN", y);
+          const details = [
+            ["Datum / Uhrzeit", formattedDateTime()],
+            ["Monteur", technicianInput.value.trim()],
+            ["Auftragsnummer", $("#job-number").value.trim()],
+            ["Adresse", $("#address").value.trim()]
+          ];
+          doc.setFontSize(10);
+          for (const [label, value] of details) {
+            y = ensurePdfSpace(doc, y, 7);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(52, 64, 84);
+            doc.text(`${label}:`, 16, y);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(23, 32, 51);
+            const lines = doc.splitTextToSize(value, 145);
+            const rowY = y;
+            y = addPdfLines(doc, lines, 52, y, 5);
+            y = Math.max(y, rowY + 7);
+          }
+
+          y += 3;
+          y = addSectionHeading(doc, "DURCHGEFÜHRTE ARBEITEN / PRÜFUNG", y);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(23, 32, 51);
+          const descriptionLines = doc.splitTextToSize($("#work-description").value.trim(), 174);
+          y = addPdfLines(doc, descriptionLines, 16, y, 5) + 5;
+
+          y = addSectionHeading(doc, `BEWEISFOTOS${photos.length ? ` (${photos.length})` : ""}`, y);
+          for (const photo of photos) {
+            const image = new Image();
+            image.src = photo.url;
+            await image.decode();
+            const imageWidth = 172;
+            const imageHeight = Math.min(105, imageWidth * image.naturalHeight / image.naturalWidth);
+            const captionLines = photo.caption.trim() ? doc.splitTextToSize(photo.caption.trim(), 170) : [];
+            y = ensurePdfSpace(doc, y, imageHeight + 7);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(52, 64, 84);
+            doc.text(`Foto ${photo.number}`, 16, y);
+            y += 3;
+            doc.addImage(image, "JPEG", 16, y, imageWidth, imageHeight);
+            y += imageHeight + 4;
+            if (captionLines.length) {
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(9);
+              doc.setTextColor(23, 32, 51);
+              y = addPdfLines(doc, captionLines, 16, y, 5) + 2;
+            }
+          }
+          if (!photos.length) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(100, 112, 134);
+            doc.text("Keine Beweisfotos hinzugefügt.", 16, y);
+            y += 8;
+          }
+
+          if (signatureHasInk) {
+            y = ensurePdfSpace(doc, y, 57);
+            y = addSectionHeading(doc, "UNTERSCHRIFT KUNDE / AUFTRAGGEBER", y);
+            const signatureData = signatureCanvas.toDataURL("image/png");
+            doc.addImage(signatureData, "PNG", 16, y, Math.min(90, 174), 31);
+            y += 35;
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(82, 93, 112);
+            const address = $("#address").value.trim();
+            doc.text(`Ort: ${address}`, 16, y);
+            doc.text(`Datum: ${formattedDateTime()}`, 16, y + 5);
+          }
+
+          addPdfFooters(doc);
+          doc.save(`Arbeitsnachweis_${filenameStem()}.pdf`);
+          setMessage("Der Arbeitsnachweis wurde als PDF heruntergeladen.");
+        } catch (error) {
+          console.error("PDF-Erstellung fehlgeschlagen.", error);
+          setMessage(`PDF konnte nicht erstellt werden: ${error.message || "Unbekannter Fehler"}`, true);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      $("#create-pdf").addEventListener("click", createPdf);
+      $("#reset-form").addEventListener("click", () => {
+        for (const photo of photos) URL.revokeObjectURL(photo.url);
+        photos.length = 0;
+        photoList.replaceChildren();
+        updatePhotoCount();
+        nextPhotoNumber = 1;
+        $("#job-number").value = "";
+        $("#address").value = "";
+        $("#work-description").value = "";
+        $("#date-time").value = localDateTimeValue();
+        $("#include-location").checked = false;
+        currentPosition = null;
+        $("#clear-signature").click();
+        setMessage("Neuer Auftrag vorbereitet. Der Monteurname bleibt erhalten.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").then(() => {
+            $("#connection-status").textContent = navigator.onLine
+              ? "Offline bereit – Ihre Einträge werden nicht hochgeladen."
+              : "Offline-Modus – die App ist lokal verfügbar.";
+          }).catch((error) => {
+            console.error("Service Worker konnte nicht registriert werden.", error);
+            $("#connection-status").textContent = "Offline-Speicherung ist derzeit nicht verfügbar.";
+          });
+        });
+      }
+      window.addEventListener("online", () => { $("#connection-status").textContent = "Online – Ihre Einträge werden weiterhin nicht hochgeladen."; });
+      window.addEventListener("offline", () => { $("#connection-status").textContent = "Offline-Modus – die App ist lokal verfügbar."; });
+    })();
+  </script>
+</body>
+</html>
