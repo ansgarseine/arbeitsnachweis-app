@@ -542,13 +542,15 @@
         }
         signatureCanvas.width = Math.round(rect.width * pixelRatio);
         signatureCanvas.height = Math.round(rect.height * pixelRatio);
-        signatureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-        signatureContext.lineWidth = 2.5;
+        const scaleX = signatureCanvas.width / rect.width;
+        const scaleY = signatureCanvas.height / rect.height;
+        signatureContext.setTransform(1, 0, 0, 1, 0, 0);
+        signatureContext.lineWidth = 2.5 * ((scaleX + scaleY) / 2);
         signatureContext.lineCap = "round";
         signatureContext.lineJoin = "round";
         signatureContext.strokeStyle = "#172033";
         if (oldCanvas.width && oldCanvas.height && signatureHasInk) {
-          signatureContext.drawImage(oldCanvas, 0, 0, oldCanvas.width, oldCanvas.height, 0, 0, rect.width, rect.height);
+          signatureContext.drawImage(oldCanvas, 0, 0, oldCanvas.width, oldCanvas.height, 0, 0, signatureCanvas.width, signatureCanvas.height);
         }
       }
       resizeSignatureCanvas();
@@ -561,7 +563,10 @@
       let drawing = false;
       function signaturePoint(event) {
         const rect = signatureCanvas.getBoundingClientRect();
-        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        return {
+          x: (event.clientX - rect.left) * (signatureCanvas.width / rect.width),
+          y: (event.clientY - rect.top) * (signatureCanvas.height / rect.height)
+        };
       }
       signatureCanvas.addEventListener("pointerdown", (event) => {
         drawing = true;

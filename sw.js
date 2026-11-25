@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "arbeitsnachweis-app-v1";
+const CACHE_NAME = "arbeitsnachweis-app-v2";
 const APP_FILES = [
   "./",
   "./index.html",
