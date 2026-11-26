@@ -151,8 +151,10 @@
     .photo-card-body .button { width: 100%; min-height: 42px; font-size: .88rem; }
     .empty-photos { margin: 18px 0 0; padding: 20px; border: 1px dashed #cbd4e2; border-radius: 11px; color: var(--muted); font-size: .9rem; text-align: center; }
 
-    .signature-wrap { overflow: hidden; border: 1px solid #ccd4e0; border-radius: 10px; background: #fff; }
-    #signature-canvas { display: block; width: 100%; height: 190px; touch-action: none; }
+    .signature-wrap { overflow: hidden; border: 1px solid #ccd4e0; border-radius: 10px; background: #ffffff; }
+    #signature-canvas { display: block; width: 100%; height: 190px; background: #ffffff !important; color-scheme: only light; touch-action: none; }
+    .signature-fields { margin-top: 16px; }
+    .signature-fields .field { margin-bottom: 16px; }
     .signature-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
     .signature-status { margin: 0; color: var(--muted); font-size: .84rem; }
     .form-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 20px; }
@@ -243,12 +245,19 @@
       <section class="card" aria-labelledby="signature-heading">
         <div class="section-heading">
           <span class="section-number" aria-hidden="true">3</span>
-          <div><h2 id="signature-heading">Unterschrift (optional)</h2><p class="section-hint">Der Kunde kann direkt auf dem Bildschirm unterschreiben. Ohne Unterschrift lässt sich der PDF-Nachweis ebenfalls erstellen.</p></div>
+          <div><h2 id="signature-heading">Unterschrift (optional)</h2><p class="section-hint">Der Kunde kann optional seinen Klarnamen angeben und direkt auf dem Bildschirm unterschreiben.</p></div>
         </div>
-        <div class="signature-wrap"><canvas id="signature-canvas" aria-label="Unterschriftenfeld"></canvas></div>
-        <div class="signature-footer">
-          <p id="signature-status" class="signature-status">Noch keine Unterschrift erfasst.</p>
-          <button class="button danger" id="clear-signature" type="button">Unterschrift löschen</button>
+        <label class="toggle-label" for="include-signature"><input id="include-signature" type="checkbox" aria-controls="signature-details"> Kundenunterschrift hinzufügen</label>
+        <div id="signature-details" class="signature-fields" hidden>
+          <div class="field">
+            <label for="signer-name">Name des Unterzeichners (Klarname)</label>
+            <input id="signer-name" type="text" autocomplete="name" placeholder="Vor- und Nachname">
+          </div>
+          <div class="signature-wrap"><canvas id="signature-canvas" aria-label="Unterschriftenfeld"></canvas></div>
+          <div class="signature-footer">
+            <p id="signature-status" class="signature-status">Noch keine Unterschrift erfasst.</p>
+            <button class="button danger" id="clear-signature" type="button">Unterschrift löschen</button>
+          </div>
         </div>
       </section>
 
@@ -548,17 +557,24 @@
         signatureContext.lineWidth = 2.5 * ((scaleX + scaleY) / 2);
         signatureContext.lineCap = "round";
         signatureContext.lineJoin = "round";
-        signatureContext.strokeStyle = "#172033";
+        signatureContext.strokeStyle = "#000000";
+        signatureContext.fillStyle = "#ffffff";
+        signatureContext.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
         if (oldCanvas.width && oldCanvas.height && signatureHasInk) {
           signatureContext.drawImage(oldCanvas, 0, 0, oldCanvas.width, oldCanvas.height, 0, 0, signatureCanvas.width, signatureCanvas.height);
         }
       }
-      resizeSignatureCanvas();
       if ("ResizeObserver" in window) {
         new ResizeObserver(resizeSignatureCanvas).observe(signatureCanvas);
       } else {
         window.addEventListener("resize", resizeSignatureCanvas);
       }
+      const signatureToggle = $("#include-signature");
+      const signatureDetails = $("#signature-details");
+      signatureToggle.addEventListener("change", () => {
+        signatureDetails.hidden = !signatureToggle.checked;
+        if (signatureToggle.checked) resizeSignatureCanvas();
+      });
 
       let drawing = false;
       function signaturePoint(event) {
@@ -591,6 +607,8 @@
       signatureCanvas.addEventListener("lostpointercapture", stopDrawing);
       $("#clear-signature").addEventListener("click", () => {
         signatureContext.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        signatureContext.fillStyle = "#ffffff";
+        signatureContext.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
         signatureHasInk = false;
         $("#signature-status").textContent = "Noch keine Unterschrift erfasst.";
       });
@@ -723,8 +741,9 @@
             const image = new Image();
             image.src = photo.url;
             await image.decode();
-            const imageWidth = 172;
-            const imageHeight = Math.min(105, imageWidth * image.naturalHeight / image.naturalWidth);
+            const imageScale = Math.min(172 / image.naturalWidth, 105 / image.naturalHeight);
+            const imageWidth = image.naturalWidth * imageScale;
+            const imageHeight = image.naturalHeight * imageScale;
             const captionLines = photo.caption.trim() ? doc.splitTextToSize(photo.caption.trim(), 170) : [];
             y = ensurePdfSpace(doc, y, imageHeight + 7);
             doc.setFont("helvetica", "bold");
@@ -749,18 +768,28 @@
             y += 8;
           }
 
-          if (signatureHasInk) {
-            y = ensurePdfSpace(doc, y, 57);
+          const signerName = $("#signer-name").value.trim();
+          if (signatureToggle.checked && (signatureHasInk || signerName)) {
+            const signatureScale = Math.min(90 / signatureCanvas.width, 31 / signatureCanvas.height);
+            const signatureWidth = signatureCanvas.width * signatureScale;
+            const signatureHeight = signatureCanvas.height * signatureScale;
+            const signerLines = doc.splitTextToSize(`Name des Unterzeichners: ${signerName || "—"}`, 174);
+            const locationLines = doc.splitTextToSize(`Ort: ${$("#address").value.trim()}`, 174);
+            const detailsHeight = (signerLines.length + locationLines.length + 1) * 5;
+            const signatureBlockHeight = detailsHeight + (signatureHasInk ? signatureHeight + 3 : 0);
+            y = ensurePdfSpace(doc, y, signatureBlockHeight + 10);
             y = addSectionHeading(doc, "UNTERSCHRIFT KUNDE / AUFTRAGGEBER", y);
-            const signatureData = signatureCanvas.toDataURL("image/png");
-            doc.addImage(signatureData, "PNG", 16, y, Math.min(90, 174), 31);
-            y += 35;
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
             doc.setTextColor(82, 93, 112);
-            const address = $("#address").value.trim();
-            doc.text(`Ort: ${address}`, 16, y);
-            doc.text(`Datum: ${formattedDateTime()}`, 16, y + 5);
+            y = addPdfLines(doc, signerLines, 16, y, 5);
+            y = addPdfLines(doc, locationLines, 16, y, 5);
+            y = addPdfLines(doc, [`Datum: ${formattedDateTime()}`], 16, y, 5) + 2;
+            if (signatureHasInk) {
+              const signatureData = signatureCanvas.toDataURL("image/png");
+              doc.addImage(signatureData, "PNG", 16, y, signatureWidth, signatureHeight);
+              y += signatureHeight + 3;
+            }
           }
 
           addPdfFooters(doc);
@@ -787,6 +816,9 @@
         $("#date-time").value = localDateTimeValue();
         $("#include-location").checked = false;
         currentPosition = null;
+        signatureToggle.checked = false;
+        signatureDetails.hidden = true;
+        $("#signer-name").value = "";
         $("#clear-signature").click();
         setMessage("Neuer Auftrag vorbereitet. Der Monteurname bleibt erhalten.");
         window.scrollTo({ top: 0, behavior: "smooth" });
